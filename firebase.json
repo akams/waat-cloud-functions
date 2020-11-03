@@ -1,0 +1,8 @@
+{
+	"ignore": [],
+	"rewrites": [{
+		"source": "/api/v1/**",
+		"function": "waatCloudFunction"
+		}
+	]
+}
