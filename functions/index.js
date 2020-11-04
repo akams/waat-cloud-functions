@@ -74,7 +74,7 @@ app.post('/manage/users/validate', async (request, response) => {
       validate: true
     };
     const userRef = db.collection('users').doc(uid);
-    await userRef.update(data, { merge: true });
+    await userRef.update(data);
     response.status(200).send("success");
   }
   catch (error) {
