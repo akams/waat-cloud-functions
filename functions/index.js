@@ -41,7 +41,6 @@ app.post('/signup', async (request, response) => {
     response.status(500).send({ err: error.message });
   }
 });
-
 // signin for business
 app.post('/signup/business', async (request, response) => {
   try {
@@ -61,6 +60,21 @@ app.post('/signup/business', async (request, response) => {
       },
       { merge: true }
     );
+    response.status(200).send("success");
+  }
+  catch (error) {
+    response.status(500).send({ err: error.message });
+  }
+});
+// update value validate for authorize user to connecte into app
+app.post('/manage/users/validate', async (request, response) => {
+  try {
+    const { uid } = request.body;
+    const data = {
+      validate: true
+    };
+    const userRef = db.collection('users').doc(uid);
+    await userRef.update(data, { merge: true });
     response.status(200).send("success");
   }
   catch (error) {
