@@ -67,7 +67,7 @@ main.use(bodyParser.json());
 exports.waatCloudFunction = functions.https.onRequest(main);
 
 app.get('/warmup', (request, response) => {
-  response.send(`Warming up serverless. Hello ${request.user.name}`);
+  response.send(`Warming up serverless. Hello ${request.user}`);
 });
 
 // signin for waat user
