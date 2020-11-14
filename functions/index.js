@@ -58,6 +58,27 @@ const validateFirebaseIdToken = async (req, res, next) => {
   }
 };
 
+// Verify ACL permission user
+const validePermissionUser = async (req, res, next) => {
+    const { uid } = req.user;
+    const userRef = db.collection('users').doc(uid);
+    const doc = await userRef.get();
+    if (!doc.exists) {
+      console.log('No such document!');
+      res.status(404).send({ err: 'No such document for user uid' });
+      return;
+    }
+    console.log('Document user data:', doc.data());
+    const user = { id: doc.id , ...doc.data() };
+    const { acl: { guest } } = user;
+    if (guest) {
+      res.status(403).send('Unauthorized user, missing permission read');
+      return;
+    }
+    next();
+    return;
+};
+
 main.use(cors);
 main.use(cookieParser);
 main.use(validateFirebaseIdToken);
@@ -114,7 +135,7 @@ app.post('/signup/business', async (request, response) => {
   }
 });
 // update value validate for authorize user to connecte into app
-app.post('/manage/users/validate', async (request, response) => {
+app.post('/manage/users/validate', validePermissionUser, async (request, response) => {
   try {
     const { uid } = request.body;
     const data = {
@@ -130,7 +151,7 @@ app.post('/manage/users/validate', async (request, response) => {
 });
 
 // update value for work sheet
-app.post('/prospect', async (request, response) => {
+app.post('/prospect', validePermissionUser, async (request, response) => {
   try {
     const { uid, dataToApi } = request.body;
 
@@ -173,35 +194,39 @@ async function sendMessage(toEmail, datetravauxPrev) {
   console.log("Message sent: %s", info.messageId);
 }
 // for bar graph
-app.get('/get-statistics-prospect', async (request, response) => {
-  const prospectRef = db.collection('prospects');
-  // TODO: à remplacer par une request.query
-  const startfulldate = admin.firestore.Timestamp.fromDate(new Date("2020"));
-  const querySnapshot = await prospectRef.where('leadTransmissionDate', '>=', startfulldate).get();
-  const data = [];
-  querySnapshot.forEach((doc) => {
-    data.push({
-      id: doc.id,
-      ...doc.data()
+app.get('/get-statistics-prospect', validePermissionUser, async (request, response) => {
+  try {
+    const prospectRef = db.collection('prospects');
+    // TODO: à remplacer par une request.query
+    const startfulldate = admin.firestore.Timestamp.fromDate(new Date("2020"));
+    const querySnapshot = await prospectRef.where('leadTransmissionDate', '>=', startfulldate).get();
+    const data = [];
+    querySnapshot.forEach((doc) => {
+      data.push({
+        id: doc.id,
+        ...doc.data()
+      });
     });
-  });
+    // const months = res.map(o => moment(o.leadTransmissionDate).subtract(0, "month").startOf("month").format('MMMM')).filter((value, index, array) => array.indexOf (value) == index);
 
-  // const months = res.map(o => moment(o.leadTransmissionDate).subtract(0, "month").startOf("month").format('MMMM')).filter((value, index, array) => array.indexOf (value) == index);
+    const updatedData = data.reduce((acc, curr) => {
+      const { id, leadTransmissionDate } = curr;
+      let date = leadTransmissionDate;
+      if (typeof leadTransmissionDate !== 'string') {
+        date = transformTimeFirebaseToMomentTime(leadTransmissionDate)
+      }
+      const month = moment(date).subtract(0, "month").startOf("month").format('MMMM')
+      return {...acc, [month]: [...(acc[month] || []), id]};
+    }, {});
 
-  const updatedData = data.reduce((acc, curr) => {
-    const { id, leadTransmissionDate } = curr;
-    let date = leadTransmissionDate;
-    if (typeof leadTransmissionDate !== 'string') {
-      date = transformTimeFirebaseToMomentTime(leadTransmissionDate)
-    }
-    const month = moment(date).subtract(0, "month").startOf("month").format('MMMM')
-    return {...acc, [month]: [...(acc[month] || []), id]};
-  }, {});
-
-  response.json(updatedData);
+    response.json(updatedData);
+  }
+  catch(e) {
+    response.status(500).send({ err: error.message });
+  }
 });
 // for chart graph
-app.get('/get-statistics-prospect-with-status', async (request, response) => {
+app.get('/get-statistics-prospect-with-status', validePermissionUser, async (request, response) => {
   // TODO: à remplacer par une request.query
   const startfulldate = admin.firestore.Timestamp.fromDate(new Date("2020"));
   const refQuery = db.collection('prospects');
