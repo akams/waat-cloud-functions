@@ -284,18 +284,26 @@ app.get('/get-statistics-prospect-with-status', validePermissionUser, async (req
 app.get('/get-simple-stats-info', validePermissionUser, async (request, response) => {
   var yesterdayDateMoment = moment().subtract(1, 'days').format('YYYY-MM-DD HH:mm:ss')
   var lastWeekDateMoment = moment().subtract(14, 'days').format('YYYY-MM-DD HH:mm:ss')
+  var lastMonthDateMoment = moment().subtract(31, 'days').format('YYYY-MM-DD HH:mm:ss')
   const yesterday = admin.firestore.Timestamp.fromDate(new Date(yesterdayDateMoment));
   const lastWeek = admin.firestore.Timestamp.fromDate(new Date(lastWeekDateMoment));
+  const lastMonth = admin.firestore.Timestamp.fromDate(new Date(lastMonthDateMoment));
 
   const refUser = db.collection('users');
   const querySnapshotUsers = await refUser.where('dateCreat', '>=' , yesterday).orderBy('dateCreat', 'desc').get();
 
   const refProspect = db.collection('prospects');
-  const querySnapshotLastWeek = await refProspect.where('leadTransmissionDate', '>=' , lastWeek).orderBy('leadTransmissionDate', 'desc').get();
+  // data last week new prospect
+  const query = refProspect.where('statusWorksheet.status', '==' , 'terminer');
+  const querySnapshotLastWeek = await query.where('leadTransmissionDate', '>=' , lastWeek).orderBy('leadTransmissionDate', 'desc').get();
+
+  // data last month new prospect
+  const querySnapshotLastMonth = await refProspect.where('leadTransmissionDate', '>=' , lastMonth).orderBy('leadTransmissionDate', 'desc').get();
 
   response.json({
     newBusinessProviderSize: querySnapshotUsers.size,
     newWorksheetSize: querySnapshotLastWeek.size,
+    newLeadAcquisitionSize: querySnapshotLastMonth.size,
   });
 });
 
