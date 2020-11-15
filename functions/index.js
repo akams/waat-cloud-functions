@@ -88,7 +88,10 @@ main.use(bodyParser.json());
 exports.waatCloudFunction = functions.https.onRequest(main);
 
 app.get('/warmup', (request, response) => {
-  response.send(`Warming up serverless. Hello ${request.user}`);
+  response.json({
+    msg: 'Warming up serverless.',
+    user: request.user,
+  });
 });
 
 // signin for waat user
@@ -98,7 +101,8 @@ app.post('/signup', async (request, response) => {
     const data = {
       email, lastname, firstname,
       acl: { admin: true },
-      validate: false
+      validate: false,
+      dateCreat: new Date(),
     };
     const userRef = db.collection('users').doc(uid);
     await userRef.set(data);
@@ -116,7 +120,8 @@ app.post('/signup/business', async (request, response) => {
     const data = {
       email, lastname, firstname,
       acl: { guest: true },
-      validate: false
+      validate: false,
+      dateCreat: new Date(),
     };
     const userRef = db.collection('users').doc(uid);
     await userRef.set(data);
@@ -222,7 +227,7 @@ app.get('/get-statistics-prospect', validePermissionUser, async (request, respon
     response.json(updatedData);
   }
   catch(e) {
-    response.status(500).send({ err: error.message });
+    response.status(500).send({ err: e.message });
   }
 });
 // for chart graph
@@ -273,6 +278,24 @@ app.get('/get-statistics-prospect-with-status', validePermissionUser, async (req
   response.json({
     onload: updatedDataOnLoad,
     done: updatedDataDone,
+  });
+});
+
+app.get('/get-simple-stats-info', validePermissionUser, async (request, response) => {
+  var yesterdayDateMoment = moment().subtract(1, 'days').format('YYYY-MM-DD HH:mm:ss')
+  var lastWeekDateMoment = moment().subtract(14, 'days').format('YYYY-MM-DD HH:mm:ss')
+  const yesterday = admin.firestore.Timestamp.fromDate(new Date(yesterdayDateMoment));
+  const lastWeek = admin.firestore.Timestamp.fromDate(new Date(lastWeekDateMoment));
+
+  const refUser = db.collection('users');
+  const querySnapshotUsers = await refUser.where('dateCreat', '>=' , yesterday).orderBy('dateCreat', 'desc').get();
+
+  const refProspect = db.collection('prospects');
+  const querySnapshotLastWeek = await refProspect.where('leadTransmissionDate', '>=' , lastWeek).orderBy('leadTransmissionDate', 'desc').get();
+
+  response.json({
+    newBusinessProviderSize: querySnapshotUsers.size,
+    newWorksheetSize: querySnapshotLastWeek.size,
   });
 });
 
