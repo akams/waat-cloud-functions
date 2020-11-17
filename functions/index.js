@@ -2,8 +2,6 @@ const functions = require('firebase-functions');
 const admin = require('firebase-admin');
 const express = require('express');
 const bodyParser = require('body-parser');
-const nodemailer = require('nodemailer');
-const moment =  require('moment');
 const cookieParser = require('cookie-parser')();
 const cors = require('cors')({origin: true});
 const prospectsModel = require('./model/prospects');
@@ -159,46 +157,13 @@ app.post('/manage/users/validate', validePermissionUser, async (request, respons
 // update value for work sheet
 app.post('/prospect', validePermissionUser, async (request, response) => {
   try {
-    const { uid, dataToApi } = request.body;
-
-    const prospectRef = db.collection('prospects').doc(uid);
-    await prospectRef.update({
-      ...dataToApi,
-    });
-    const { email, keyDate: { datetravauxPrev } } = dataToApi;
-    if (email !== '' && datetravauxPrev && typeof datetravauxPrev === 'string') {
-      await sendMessage(email, datetravauxPrev).catch(console.error);
-    }
-
+    await prospectsModel.handleUpdateProspect(db, request.body);
     response.status(200).send("success");
   }
   catch (error) {
     response.status(500).send({ err: error.message });
   }
 });
-
-async function sendMessage(toEmail, datetravauxPrev) {
-  const now = moment("2020-12-20T23:00:00.000Z").format('YYYY-MM-DD');
-
-  // create reusable transporter object using the default SMTP transport
-  const transporter = nodemailer.createTransport({
-    service: "Gmail",
-    auth: {
-      user: "",
-      pass: ""
-    }
-  });
-
-  // send mail with defined transport object
-  let info = await transporter.sendMail({
-    from: '"Info WAAT" <foo@example.com>', // sender address
-    to: "e.ndjawe@gmail.com", // list of receivers
-    subject: "Date de travaux prévisionnnelle", // Subject line
-    text: `Bonjour, une date de travaux prévisionnelle a été fixer pour votre chantier, celui-ci se déroulera pour le ${now}`, // plain text body
-    // html: "<b>Hello world?</b>", // html body
-  });
-  console.log("Message sent: %s", info.messageId);
-}
 
 // Get prospects
 app.get('/prospect', validePermissionUser, async (request, response) => {

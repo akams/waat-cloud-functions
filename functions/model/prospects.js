@@ -1,5 +1,55 @@
 const moment =  require('moment');
+const nodemailer = require('nodemailer');
 const utils = require('../scripts/utils');
+
+/**
+ * Process to update data
+ * @db {firestore} connexion to bdd - is mandatory
+ * @body {object} data from post
+ */
+async function handleUpdateProspect(db, body) {
+  try {
+    if (!db) {
+      throw new Error('{db} firestore is required to continue the process');
+    }
+    const { uid, dataToApi } = body;
+
+    const prospectRef = db.collection('prospects').doc(uid);
+    await prospectRef.update({
+      ...dataToApi,
+    });
+    const { email, keyDate: { datetravauxPrev } } = dataToApi;
+    if (email !== '' && datetravauxPrev && typeof datetravauxPrev === 'string') {
+      await sendMessage(email, datetravauxPrev).catch(console.error);
+    }
+  } catch (error) {
+    return error;
+  }
+}
+
+
+async function sendMessage(toEmail, datetravauxPrev) {
+  const now = moment("2020-12-20T23:00:00.000Z").format('YYYY-MM-DD');
+
+  // create reusable transporter object using the default SMTP transport
+  const transporter = nodemailer.createTransport({
+    service: "Gmail",
+    auth: {
+      user: "",
+      pass: ""
+    }
+  });
+
+  // send mail with defined transport object
+  let info = await transporter.sendMail({
+    from: '"Info WAAT" <foo@example.com>', // sender address
+    to: "e.ndjawe@gmail.com", // list of receivers
+    subject: "Date de travaux prévisionnnelle", // Subject line
+    text: `Bonjour, une date de travaux prévisionnelle a été fixer pour votre chantier, celui-ci se déroulera pour le ${now}`, // plain text body
+    // html: "<b>Hello world?</b>", // html body
+  });
+  console.log("Message sent: %s", info.messageId);
+}
 
 /**
  * Process to get data prospect with or not id
@@ -193,6 +243,7 @@ async function methodName(db) {
   }
 }
 
+exports.handleUpdateProspect = handleUpdateProspect;
 exports.handleGetProspects = handleGetProspects;
 exports.handleGetStatisticsProspect = handleGetStatisticsProspect;
 exports.handleGetStatisticsProspectWithStatus = handleGetStatisticsProspectWithStatus;
