@@ -6,7 +6,7 @@ const nodemailer = require('nodemailer');
 const moment =  require('moment');
 const cookieParser = require('cookie-parser')();
 const cors = require('cors')({origin: true});
-const _ = require('lodash');
+const prospectsModel = require('./model/prospects');
 
 admin.initializeApp(functions.config().firebase);
 
@@ -204,7 +204,7 @@ async function sendMessage(toEmail, datetravauxPrev) {
 app.get('/prospect', validePermissionUser, async (request, response) => {
   try {
     const { limit = 5 } = request.query;
-    const datas = await processGetProspect(undefined, limit);
+    const datas = await prospectsModel.handleGetProspects(db, undefined, limit);
     response.json(datas);
   } catch (error) {
     response.status(500).send({ err: error.message });
@@ -219,41 +219,12 @@ app.get('/prospect/:id', async (request, response) => {
     if (!id) {
       throw new Error('id is required to operate request');
     }
-    const datas = await processGetProspect(id, limit);
+    const datas = await prospectsModel.handleGetProspects(db, id, limit);
     response.json(datas);
   } catch (error) {
     response.status(500).send({ err: error.message });
   }
 });
-
-async function processGetProspect (id, limit) {
-  let queryProspects = db.collection('prospects');
-
-  if (id) {
-    queryProspects = db.collection('prospects').where('uidCompany', '==', id);
-  }
-  const snapshotProspects = await queryProspects.orderBy('leadTransmissionDate', 'desc').limit(limit).get();
-  const dataProspects = [];
-  snapshotProspects.forEach((doc) => {
-    dataProspects.push({
-      id: doc.id,
-      ...doc.data()
-    });
-  });
-
-  const collectionCompanies = db.collection('companies');
-  const reads = dataProspects.map((prospect) => collectionCompanies.doc(prospect.uidCompany).get());
-  const results = await Promise.all(reads);
-  const companies = results.map((v) => ({ uidCompany: v.id, ...v.data() }));
-  const merge = mergeArraysByKeyId(dataProspects, companies, 'uidCompany');
-  const datas = merge.map((m) => ({
-    id: m.id,
-    company: m.name,
-    leadTransmissionDate: m.leadTransmissionDate,
-    prospectName: `${m.firstname} ${m.lastname}`,
-  }));
-  return datas;
-}
 
 // for bar graph
 app.get('/get-statistics-prospect', validePermissionUser, async (request, response) => {
@@ -369,18 +340,4 @@ function transformTimeFirebaseToMomentTime(firebaseDateTime) {
     const dateInMillis = firebaseDateTime._seconds * 1000;
     return moment(dateInMillis).format('YYYY-MM-DD HH:mm:ss');
   }
-}
-
-function mergeArraysByKeyId(tab, tab2, keyId) {
-  _.mixin({
-    mergeByKey(arr1, arr2, key) {
-      const criteria = {};
-      criteria[key] = null;
-      return _.map(arr1, function (item) {
-        criteria[key] = item[key];
-        return _.merge(item, _.find(arr2, criteria));
-      });
-    },
-  });
-  return _.mergeByKey(tab, tab2, keyId);
 }
