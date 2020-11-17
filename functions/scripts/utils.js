@@ -1,4 +1,5 @@
 const _ = require('lodash');
+const moment =  require('moment');
 
 /**
  * Merge two array of object with a key
@@ -20,5 +21,13 @@ function mergeArraysByKeyId(tab, tab2, keyId) {
   return _.mergeByKey(tab, tab2, keyId);
 }
 
+function transformTimeFirebaseToMomentTime(firebaseDateTime) {
+  if (firebaseDateTime && typeof firebaseDateTime === 'object') {
+    const dateInMillis = firebaseDateTime._seconds * 1000;
+    return moment(dateInMillis).format('YYYY-MM-DD HH:mm:ss');
+  }
+}
+
 
 exports.mergeArraysByKeyId = mergeArraysByKeyId;
+exports.transformTimeFirebaseToMomentTime = transformTimeFirebaseToMomentTime;

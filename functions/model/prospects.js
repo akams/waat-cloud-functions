@@ -1,3 +1,4 @@
+const moment =  require('moment');
 const utils = require('../scripts/utils');
 
 /**
@@ -43,4 +44,156 @@ async function handleGetProspects (db, id, limit = 5) {
   }
 }
 
+/**
+ * Process to get data for kpi bar graph
+ * @db {firestore} - required
+ * @admin {admin - sdk}  - required
+ */
+async function handleGetStatisticsProspect(db, admin) {
+  try {
+    if (!db || !admin) {
+      throw new Error('Missing {db} or {admin} variable process to continue.');
+    }
+    const prospectRef = db.collection('prospects');
+    // TODO: à remplacer par une request.query for filter by date
+    const startfulldate = admin.firestore.Timestamp.fromDate(new Date("2020"));
+    const querySnapshot = await prospectRef.where('leadTransmissionDate', '>=', startfulldate).get();
+    const data = [];
+    querySnapshot.forEach((doc) => {
+      data.push({
+        id: doc.id,
+        ...doc.data()
+      });
+    });
+    // const months = res.map(o => moment(o.leadTransmissionDate).subtract(0, "month").startOf("month").format('MMMM')).filter((value, index, array) => array.indexOf (value) == index);
+
+    const updatedData = data.reduce((acc, curr) => {
+      const { id, leadTransmissionDate } = curr;
+      let date = leadTransmissionDate;
+      if (typeof leadTransmissionDate !== 'string') {
+        date = utils.transformTimeFirebaseToMomentTime(leadTransmissionDate)
+      }
+      const month = moment(date).subtract(0, "month").startOf("month").format('MMMM')
+      return {...acc, [month]: [...(acc[month] || []), id]};
+    }, {});
+
+    return updatedData;
+  } catch (error) {
+    return error;
+  }
+}
+
+/**
+ * Process to get data for kpi chart graph
+ * @db {firestore} - required
+ * @admin {admin - sdk}  - required
+ */
+async function handleGetStatisticsProspectWithStatus(db, admin) {
+  try {
+    if (!db || !admin) {
+      throw new Error('Missing {db} or {admin} variable process to continue.');
+    }
+    // TODO: à remplacer par une request.query
+    const startfulldate = admin.firestore.Timestamp.fromDate(new Date("2020"));
+    const refQuery = db.collection('prospects');
+    let query = refQuery.where('leadTransmissionDate', '>=', startfulldate)
+    const querySnapshotEnCours = await query.where('statusWorksheet.status', '==', 'en cours').get();
+    const dataEnCours = [];
+    querySnapshotEnCours.forEach((doc) => {
+      dataEnCours.push({
+        id: doc.id,
+        ...doc.data()
+      });
+    });
+
+    const updatedDataOnLoad = dataEnCours.reduce((acc, curr) => {
+      const { id, leadTransmissionDate } = curr;
+      let date = leadTransmissionDate;
+      if (typeof leadTransmissionDate !== 'string') {
+        date = utils.transformTimeFirebaseToMomentTime(leadTransmissionDate)
+      }
+      const month = moment(date).subtract(0, "month").startOf("month").format('MMMM')
+      return {...acc, [month]: [...(acc[month] || []), id]};
+    }, {});
+
+    let query2 = refQuery.where('leadTransmissionDate', '>=', startfulldate)
+    const querySnapshotDone = await query2.where('statusWorksheet.status', '==', 'terminer').get();
+    const dataDone = [];
+    querySnapshotDone.forEach((doc) => {
+      dataDone.push({
+        id: doc.id,
+        ...doc.data()
+      });
+    });
+
+    const updatedDataDone = dataDone.reduce((acc, curr) => {
+      const { id, leadTransmissionDate } = curr;
+      let date = leadTransmissionDate;
+      if (typeof leadTransmissionDate !== 'string') {
+        date = utils.transformTimeFirebaseToMomentTime(leadTransmissionDate)
+      }
+      const month = moment(date).subtract(0, "month").startOf("month").format('MMMM')
+      return {...acc, [month]: [...(acc[month] || []), id]};
+    }, {});
+
+    return {
+      onload: updatedDataOnLoad,
+      done: updatedDataDone,
+    };
+  } catch (error) {
+    return error;
+  }
+}
+
+/**
+ * Process to get data info for kpi - simple data nb by
+ * @db {firestore} - required
+ * @admin {admin - sdk}  - required
+ */
+async function handleGetSimpleStatsInfo(db, admin) {
+  try {
+    if (!db || !admin) {
+      throw new Error('Missing {db} or {admin} variable process to continue.');
+    }
+    var yesterdayDateMoment = moment().subtract(1, 'days').format('YYYY-MM-DD HH:mm:ss')
+    var lastWeekDateMoment = moment().subtract(14, 'days').format('YYYY-MM-DD HH:mm:ss')
+    var lastMonthDateMoment = moment().subtract(31, 'days').format('YYYY-MM-DD HH:mm:ss')
+    const yesterday = admin.firestore.Timestamp.fromDate(new Date(yesterdayDateMoment));
+    const lastWeek = admin.firestore.Timestamp.fromDate(new Date(lastWeekDateMoment));
+    const lastMonth = admin.firestore.Timestamp.fromDate(new Date(lastMonthDateMoment));
+
+    const refUser = db.collection('users');
+    const querySnapshotUsers = await refUser.where('dateCreat', '>=' , yesterday).orderBy('dateCreat', 'desc').get();
+
+    const refProspect = db.collection('prospects');
+    // data last week new prospect
+    const query = refProspect.where('statusWorksheet.status', '==' , 'terminer');
+    const querySnapshotLastWeek = await query.where('leadTransmissionDate', '>=' , lastWeek).orderBy('leadTransmissionDate', 'desc').get();
+
+    // data last month new prospect
+    const querySnapshotLastMonth = await refProspect.where('leadTransmissionDate', '>=' , lastMonth).orderBy('leadTransmissionDate', 'desc').get();
+
+    return {
+      newBusinessProviderSize: querySnapshotUsers.size,
+      newWorksheetSize: querySnapshotLastWeek.size,
+      newLeadAcquisitionSize: querySnapshotLastMonth.size,
+    };
+  } catch (error) {
+    return error;
+  }
+}
+
+async function methodName(db) {
+  try {
+    if (!db) {
+      throw new Error('db firestore is required to continue the process');
+    }
+  } catch (error) {
+    return error;
+  }
+}
+
 exports.handleGetProspects = handleGetProspects;
+exports.handleGetStatisticsProspect = handleGetStatisticsProspect;
+exports.handleGetStatisticsProspectWithStatus = handleGetStatisticsProspectWithStatus;
+exports.handleGetSimpleStatsInfo = handleGetSimpleStatsInfo;

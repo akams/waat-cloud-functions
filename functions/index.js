@@ -229,30 +229,8 @@ app.get('/prospect/:id', async (request, response) => {
 // for bar graph
 app.get('/get-statistics-prospect', validePermissionUser, async (request, response) => {
   try {
-    const prospectRef = db.collection('prospects');
-    // TODO: à remplacer par une request.query
-    const startfulldate = admin.firestore.Timestamp.fromDate(new Date("2020"));
-    const querySnapshot = await prospectRef.where('leadTransmissionDate', '>=', startfulldate).get();
-    const data = [];
-    querySnapshot.forEach((doc) => {
-      data.push({
-        id: doc.id,
-        ...doc.data()
-      });
-    });
-    // const months = res.map(o => moment(o.leadTransmissionDate).subtract(0, "month").startOf("month").format('MMMM')).filter((value, index, array) => array.indexOf (value) == index);
-
-    const updatedData = data.reduce((acc, curr) => {
-      const { id, leadTransmissionDate } = curr;
-      let date = leadTransmissionDate;
-      if (typeof leadTransmissionDate !== 'string') {
-        date = transformTimeFirebaseToMomentTime(leadTransmissionDate)
-      }
-      const month = moment(date).subtract(0, "month").startOf("month").format('MMMM')
-      return {...acc, [month]: [...(acc[month] || []), id]};
-    }, {});
-
-    response.json(updatedData);
+    const data = await prospectsModel.handleGetStatisticsProspect(db, admin);
+    response.json(data);
   }
   catch(e) {
     response.status(500).send({ err: e.message });
@@ -260,84 +238,22 @@ app.get('/get-statistics-prospect', validePermissionUser, async (request, respon
 });
 // for chart graph
 app.get('/get-statistics-prospect-with-status', validePermissionUser, async (request, response) => {
-  // TODO: à remplacer par une request.query
-  const startfulldate = admin.firestore.Timestamp.fromDate(new Date("2020"));
-  const refQuery = db.collection('prospects');
-  let query = refQuery.where('leadTransmissionDate', '>=', startfulldate)
-  const querySnapshotEnCours = await query.where('statusWorksheet.status', '==', 'en cours').get();
-  const dataEnCours = [];
-  querySnapshotEnCours.forEach((doc) => {
-    dataEnCours.push({
-      id: doc.id,
-      ...doc.data()
-    });
-  });
-
-  const updatedDataOnLoad = dataEnCours.reduce((acc, curr) => {
-    const { id, leadTransmissionDate } = curr;
-    let date = leadTransmissionDate;
-    if (typeof leadTransmissionDate !== 'string') {
-      date = transformTimeFirebaseToMomentTime(leadTransmissionDate)
-    }
-    const month = moment(date).subtract(0, "month").startOf("month").format('MMMM')
-    return {...acc, [month]: [...(acc[month] || []), id]};
-  }, {});
-
-  let query2 = refQuery.where('leadTransmissionDate', '>=', startfulldate)
-  const querySnapshotDone = await query2.where('statusWorksheet.status', '==', 'terminer').get();
-  const dataDone = [];
-  querySnapshotDone.forEach((doc) => {
-    dataDone.push({
-      id: doc.id,
-      ...doc.data()
-    });
-  });
-
-  const updatedDataDone = dataDone.reduce((acc, curr) => {
-    const { id, leadTransmissionDate } = curr;
-    let date = leadTransmissionDate;
-    if (typeof leadTransmissionDate !== 'string') {
-      date = transformTimeFirebaseToMomentTime(leadTransmissionDate)
-    }
-    const month = moment(date).subtract(0, "month").startOf("month").format('MMMM')
-    return {...acc, [month]: [...(acc[month] || []), id]};
-  }, {});
-
-  response.json({
-    onload: updatedDataOnLoad,
-    done: updatedDataDone,
-  });
+  try {
+    const data = await prospectsModel.handleGetStatisticsProspectWithStatus(db, admin);
+    response.json(data);
+  }
+  catch(e) {
+    response.status(500).send({ err: e.message });
+  }
 });
 
 app.get('/get-simple-stats-info', validePermissionUser, async (request, response) => {
-  var yesterdayDateMoment = moment().subtract(1, 'days').format('YYYY-MM-DD HH:mm:ss')
-  var lastWeekDateMoment = moment().subtract(14, 'days').format('YYYY-MM-DD HH:mm:ss')
-  var lastMonthDateMoment = moment().subtract(31, 'days').format('YYYY-MM-DD HH:mm:ss')
-  const yesterday = admin.firestore.Timestamp.fromDate(new Date(yesterdayDateMoment));
-  const lastWeek = admin.firestore.Timestamp.fromDate(new Date(lastWeekDateMoment));
-  const lastMonth = admin.firestore.Timestamp.fromDate(new Date(lastMonthDateMoment));
-
-  const refUser = db.collection('users');
-  const querySnapshotUsers = await refUser.where('dateCreat', '>=' , yesterday).orderBy('dateCreat', 'desc').get();
-
-  const refProspect = db.collection('prospects');
-  // data last week new prospect
-  const query = refProspect.where('statusWorksheet.status', '==' , 'terminer');
-  const querySnapshotLastWeek = await query.where('leadTransmissionDate', '>=' , lastWeek).orderBy('leadTransmissionDate', 'desc').get();
-
-  // data last month new prospect
-  const querySnapshotLastMonth = await refProspect.where('leadTransmissionDate', '>=' , lastMonth).orderBy('leadTransmissionDate', 'desc').get();
-
-  response.json({
-    newBusinessProviderSize: querySnapshotUsers.size,
-    newWorksheetSize: querySnapshotLastWeek.size,
-    newLeadAcquisitionSize: querySnapshotLastMonth.size,
-  });
+  try {
+    const data = await prospectsModel.handleGetSimpleStatsInfo(db, admin);
+    response.json(data);
+  }
+  catch(e) {
+    response.status(500).send({ err: e.message });
+  }
 });
 
-function transformTimeFirebaseToMomentTime(firebaseDateTime) {
-  if (firebaseDateTime && typeof firebaseDateTime === 'object') {
-    const dateInMillis = firebaseDateTime._seconds * 1000;
-    return moment(dateInMillis).format('YYYY-MM-DD HH:mm:ss');
-  }
-}
